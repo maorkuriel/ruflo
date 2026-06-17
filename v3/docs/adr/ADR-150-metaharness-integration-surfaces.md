@@ -1,7 +1,7 @@
 # ADR-150 — MetaHarness Integration Surfaces in `npx ruflo`
 
-**Status**: Implemented (Phase 1 ✅ iters 1–3 · Phase 2 ✅ iters 4–32 · Phase 3 §3.1 ✅ iters 33–82 · KRR retrain pending production data · Phase 3 §3.2-§3.5 scoped in [ADR-151](ADR-151-harness-intelligence-layer.md))
-**Date**: 2026-06-16 (revised 2026-06-16 — eighty-two iterations of /loop)
+**Status**: Implemented (Phase 1 ✅ iters 1–3 · Phase 2 ✅ iters 4–32 · Phase 3 §3.1 ✅ iters 33–99 · KRR retrain pending production data · Phase 3 §3.2-§3.5 scoped in [ADR-151](ADR-151-harness-intelligence-layer.md))
+**Date**: 2026-06-16 (revised 2026-06-17 — **100 iterations of /loop**)
 **Related**: ADR-148 (cost-optimal router lifecycle via `@metaharness/router`), ADR-149 (per-model cost-optimal routing), ADR-026 (3-tier model routing), ADR-097 (federation budget circuit breaker), ADR-124 (optional native dependencies), ADR-144 (agent-authorization-propagation)
 **External reference**: [`ruvnet/agent-harness-generator`](https://github.com/ruvnet/agent-harness-generator) — the upstream that publishes `metaharness` + `@metaharness/*`. Same author (rUv), explicitly designed around ruflo primitives.
 **Research dossier**: published as a gist (linked from the tracking issue) with full graded-evidence sourcing.
@@ -467,6 +467,102 @@ All 90-day retention for cross-artifact comparability.
 - 33/33 plugin fleet still green
 - 4 CI workflows (metaharness-ci, no-metaharness-smoke, oia-audit-weekly,
   metaharness-real-data sub-job)
+
+### Iters 83-99 — cross-reference integrity + observability
+
+Eighteen more iters of hardening after iter 82's ADR refresh. Two
+coherent arcs: cross-reference integrity matrix and fast-path
+observability.
+
+#### Cross-reference integrity matrix (iters 73, 84, 89-94)
+
+Eight cross-reference surfaces now smoke-gated. Each detects a specific
+class of "thing X must point at thing Y" drift before it reaches
+production:
+
+| Source                  | Target                  | Iter |
+|-------------------------|-------------------------|------|
+| description string      | SUBCOMMANDS keys        | 73   |
+| SUBCOMMANDS values      | scripts/*.mjs           | 89   |
+| MCP handler runScript() | scripts/*.mjs           | 90   |
+| SKILL.md inline refs    | scripts/*.mjs           | 91   |
+| MCP enum                | SEVERITY_RANK keys      | 92   |
+| MCP tool names          | CLAUDE.md catalog       | 93   |
+| SUBCOMMANDS keys        | CLAUDE.md catalog       | 94   |
+| CI workflow run steps   | tripwire scripts        | 84   |
+
+Plus 3 negative-guard invariants from iters 73+74 (mint-not-in-MCP,
+no `from-repo` skill/script/MCP tool, no new static `@metaharness/*`
+imports outside neural-router.ts).
+
+#### Fast-path observability arc (iters 95-99)
+
+iter-66/67 added the `--baseline-key` (~14x) and `--baseline-file`
+(~19x) fast-paths. iter-95-99 made them observable at every consumption
+layer:
+
+- **iter 95** — derived `timing.path` field in JSON payload
+- **iter 96** — CLI table mode shows `Path: file (wall N ms)`
+- **iter 97** — Weekly cron `GITHUB_STEP_SUMMARY` shows the same
+- **iter 98** — CI dispatcher round-trip asserts JSON shape contract
+- **iter 99** — CI dispatcher round-trip ALSO asserts wall < 30s
+
+A creeping regression (e.g., fastpath quietly degrading from 1.4s to
+15s over weeks) is now visible in the Actions UI's wall annotation
+before it breaches the 30s ceiling.
+
+#### Anti-regression pattern reinforcement (iters 83-92)
+
+- **iter 84** — positive-presence guards for all 3 compat tripwires
+- **iter 86** — bench-parse-mcp-scan perf characterization
+- **iter 87** — fixed bench-scripts JSON-output contamination (iter-82
+  CI step was silently broken; iter-87 caught it during iter-87's
+  own dry-run; both bench scripts patched, runtime parse-roundtrip
+  smoke assertion added)
+- **iter 88** — family-wide JSON-output contract gate (8 scripts
+  × parse-roundtrip)
+- **iter 92** — MCP enum aligned with SEVERITY_RANK (subset+complement
+  check)
+
+### Fleet status (post-iter-99 / 100-iter milestone)
+
+- Smoke step count: 85 → 102 (+17 since iter 82)
+- MCP tool runtime contract: 117 → 120 assertions
+- Real-data roundtrip: 66 (12 stages, unchanged since iter 79)
+- Unit tests: 94 (similarity + severity + parser)
+- Compat tripwires: 3 (router API / mcp-scan text / fingerprint schema)
+- Cross-reference integrity surfaces: 8 smoke-gated
+- Negative-guard invariants: 3 smoke-gated
+- Bench scripts in CI with artifact tracking: 2
+  (bench-similarity, bench-parse-mcp-scan; both produce parseable JSON)
+- 33/33 plugin fleet still green
+- CI workflows: 4 (metaharness-ci, no-metaharness-smoke,
+  oia-audit-weekly, metaharness-real-data)
+- ~290 total ruflo-metaharness smoke assertions
+
+### 100-iter retrospective
+
+The integration shipped across 100 /loop iterations spanning the major
+arcs documented above. Two patterns emerged that are worth naming:
+
+1. **Bug-discovery via end-to-end tests** (iters 47-51, 87) — every
+   significant latent bug surfaced when a test exercised the REAL
+   CLI/MCP chain end-to-end, not when smoke greps verified source
+   markers. iter-47's schema bug hid for 9 iters; iter-50's parser
+   gap hid for 28 iters; iter-87's JSON-contamination hid for 5 iters.
+   The lesson: smoke-grep on source is a complement to, not a
+   substitute for, real-output verification.
+
+2. **Cross-reference integrity** (iters 73, 84, 89-94) — when one
+   source file references another by name, drift is the default
+   without an explicit gate. Eight surfaces are now gated; each
+   produces a specific named failure when the reference rots.
+
+The dep is now: production code with 14+ surfaces, 102 smoke steps,
+120 MCP runtime assertions, 66 roundtrip pipeline assertions, 94 unit
+tests, 8 cross-reference gates, 3 negative-guard invariants, 3 compat
+tripwires, 4 CI workflows, weekly autonomous drift detection, two
+upstream issues filed (#15, #16, both still open).
 
 ### Quote architecture invariant — no static metaharness imports
 

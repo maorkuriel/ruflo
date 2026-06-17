@@ -191,6 +191,18 @@ grep -q "execCli(\[\s*'-y'\s*,\s*'metaharness@latest'" "$F" 2>/dev/null || \
 grep -q "cwd: opts" "$F" || miss="$miss no-cwd-passthrough"
 [[ -z "$miss" ]] && ok || bad "$miss"
 
+step "17z63. ADR-150 reflects iters 83-99 + 100-iter milestone (iter 100)"
+miss=""
+ADR="$ROOT/../../v3/docs/adr/ADR-150-metaharness-integration-surfaces.md"
+grep -q "Phase 3 §3.1 ✅ iters 33–99" "$ADR" 2>/dev/null || miss="$miss no-iter-99-status"
+grep -q "100 iterations of /loop" "$ADR" 2>/dev/null || miss="$miss no-100-iter-marker"
+grep -q "Iters 83-99 — cross-reference integrity" "$ADR" 2>/dev/null || miss="$miss no-83-99-section"
+grep -q "Cross-reference integrity matrix" "$ADR" 2>/dev/null || miss="$miss no-matrix-table"
+grep -q "Fast-path observability arc" "$ADR" 2>/dev/null || miss="$miss no-fast-path-arc"
+grep -q "100-iter retrospective" "$ADR" 2>/dev/null || miss="$miss no-retrospective"
+grep -q "Fleet status (post-iter-99" "$ADR" 2>/dev/null || miss="$miss no-post-iter-99-fleet"
+[[ -z "$miss" ]] && ok || bad "$miss"
+
 step "17z62. CI dispatcher round-trip enforces wall budget (iter 99)"
 miss=""
 W="$ROOT/../../.github/workflows/metaharness-ci.yml"
@@ -499,8 +511,10 @@ grep -q "check-fingerprint-schema.mjs" "$W" 2>/dev/null || miss="$miss fingerpri
 step "17z46. ADR-150 notes reflect iters 60-82 (iter 83)"
 miss=""
 ADR="$ROOT/../../v3/docs/adr/ADR-150-metaharness-integration-surfaces.md"
-grep -q "Phase 3 §3.1 ✅ iters 33–82" "$ADR" 2>/dev/null || miss="$miss no-iter-82-status"
-grep -q "eighty-two iterations of /loop" "$ADR" 2>/dev/null || miss="$miss no-82-iter-marker"
+# iter 100 bumped these markers: "33-82" → "33-99", "eighty-two" → "100".
+# Use regex for forward-compat with future ADR refreshes.
+grep -qE "Phase 3 §3.1 ✅ iters 33–[0-9]+" "$ADR" 2>/dev/null || miss="$miss no-phase3-status"
+grep -qE "([0-9]+ iterations|[a-z]+(-[a-z]+)? iterations) of /loop" "$ADR" 2>/dev/null || miss="$miss no-iter-count-marker"
 grep -q "Iters 60–82 — performance / observability / contract hardening" "$ADR" 2>/dev/null || miss="$miss no-60-82-section"
 grep -q "Three-tripwire upstream-contract defense" "$ADR" 2>/dev/null || miss="$miss no-tripwire-section"
 grep -q "Drift-detection autonomous arc (iters 53-79)" "$ADR" 2>/dev/null || miss="$miss no-drift-arc"
@@ -871,7 +885,7 @@ ADR="$ROOT/../../v3/docs/adr/ADR-150-metaharness-integration-surfaces.md"
 # Smoke accepts any iters-NN range and any N-iteration string so future ADR
 # refreshes don't break iter-60's coverage assertion.
 grep -qE "Phase 3 §3.1 ✅ iters 33–[0-9]+" "$ADR" 2>/dev/null || miss="$miss no-phase3-status"
-grep -qE "[a-z]+(-[a-z]+)? iterations of /loop" "$ADR" 2>/dev/null || miss="$miss no-iter-count-marker"
+grep -qE "([0-9]+ iterations|[a-z]+(-[a-z]+)? iterations) of /loop" "$ADR" 2>/dev/null || miss="$miss no-iter-count-marker"
 grep -q "Phase 2 continued (iters 13–32)" "$ADR" 2>/dev/null || miss="$miss no-phase2-continued"
 grep -q "Phase 3 §3.1 — Genome Similarity Search (iters 33–59)" "$ADR" 2>/dev/null || miss="$miss no-phase3-section"
 grep -q "Real-data bug-discovery arc (iters 47-51)" "$ADR" 2>/dev/null || miss="$miss no-bug-arc"
